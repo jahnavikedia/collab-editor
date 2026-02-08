@@ -1,0 +1,21 @@
+# Java / Spring Boot
+backend/target/
+*.jar
+*.war
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Node / React
+frontend/node_modules/
+frontend/build/
+
+# Environment files (may contain secrets)
+.env
+*.env
+
+# OS junk
+.DS_Store
+Thumbs.db
