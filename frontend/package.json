@@ -2,6 +2,7 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "homepage": "/",
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.4",
     "@codemirror/state": "^6.5.4",

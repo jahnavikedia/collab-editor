@@ -1,0 +1,22 @@
+# Node modules
+frontend/node_modules
+frontend/build
+
+# Maven build artifacts
+backend/target
+
+# IDE files
+**/.idea
+**/.vscode
+**/.DS_Store
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+
+# Database files (will be created at runtime)
+backend/data
+data

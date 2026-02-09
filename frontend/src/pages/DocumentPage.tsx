@@ -100,7 +100,7 @@ export function DocumentPage() {
     const crdt = new CrdtEngine(siteId, documentId);
     crdtRef.current = crdt;
 
-    fetch(`http://localhost:8080/api/documents/${documentId}/state`)
+    fetch(`/api/documents/${documentId}/state`)
       .then(res => res.json())
       .then(chars => {
         crdt.loadFromState(chars);
@@ -116,7 +116,7 @@ export function DocumentPage() {
 
     function connectWebSocket(crdt: CrdtEngine) {
       const client = new Client({
-        webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+        webSocketFactory: () => new SockJS('/ws'),
         onConnect: () => {
           setStatus('connected');
 
