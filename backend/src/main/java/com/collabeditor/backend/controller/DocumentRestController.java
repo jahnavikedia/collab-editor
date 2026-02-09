@@ -21,4 +21,9 @@ public class DocumentRestController {
     public List<CrdtChar> getDocumentState(@PathVariable String documentId) {
         return documentService.getOrLoadDocument(documentId).getFullState();
     }
+
+    @DeleteMapping("/{documentId}")
+    public void clearDocument(@PathVariable String documentId) {
+        documentService.clearDocument(documentId);
+    }
 }

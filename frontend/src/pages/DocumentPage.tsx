@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { Editor } from '../components/Editor';
@@ -12,15 +12,26 @@ interface User {
   color: string;
 }
 
+interface CursorInfo {
+  siteId: string;
+  userName: string;
+  color: string;
+  position: number;
+}
+
 export function DocumentPage() {
   const { documentId } = useParams<{ documentId: string }>();
-  const [status, setStatus] = useState('Connecting...');
+  const navigate = useNavigate();
+  const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [remoteOps, setRemoteOps] = useState<CrdtOperation[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [cursors, setCursors] = useState<Map<string, CursorInfo>>(new Map());
+  const [copied, setCopied] = useState(false);
   const clientRef = useRef<Client | null>(null);
   const crdtRef = useRef<CrdtEngine | null>(null);
   const [siteId] = useState(() => 'user-' + Math.random().toString(36).substr(2, 6));
   const [userName] = useState(() => 'User ' + Math.random().toString(36).substr(2, 4).toUpperCase());
+  const [myColor, setMyColor] = useState('#58a6ff');
   const [ready, setReady] = useState(false);
 
   const sendOperation = useCallback((op: CrdtOperation) => {
@@ -32,6 +43,21 @@ export function DocumentPage() {
     }
   }, [documentId]);
 
+  const sendCursor = useCallback((position: number) => {
+    if (clientRef.current?.active) {
+      clientRef.current.publish({
+        destination: '/app/document.cursor',
+        body: JSON.stringify({ documentId, siteId, userName, color: myColor, position }),
+      });
+    }
+  }, [documentId, siteId, userName, myColor]);
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   useEffect(() => {
     if (!documentId) return;
 
@@ -41,71 +67,62 @@ export function DocumentPage() {
     fetch(`http://localhost:8080/api/documents/${documentId}/state`)
       .then(res => res.json())
       .then(chars => {
-        // Load server's ordered sequence directly - do NOT replay through insert algorithm
         crdt.loadFromState(chars);
-
         if (chars.length > 0) {
           setRemoteOps([{ type: 'INSERT', character: chars[0], documentId: documentId!, siteId: chars[0].siteId, clock: chars[0].clock }]);
         }
-
-        const client = new Client({
-          webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
-          onConnect: () => {
-            setStatus('Connected');
-
-            client.subscribe('/topic/document/' + documentId, (message) => {
-              const data = JSON.parse(message.body);
-              const applied = crdt.applyRemoteOperation(data.operation);
-              if (applied) {
-                setRemoteOps(prev => [...prev, data.operation]);
-              }
-            });
-
-            client.subscribe('/topic/presence/' + documentId, (message) => {
-              setUsers(JSON.parse(message.body));
-            });
-
-            // Send join message
-            client.publish({
-              destination: '/app/document.join',
-              body: JSON.stringify({ documentId, siteId, userName }),
-            });
-
-            setReady(true);
-          },
-          onWebSocketClose: () => setStatus('Disconnected'),
-        });
-
-        client.activate();
-        clientRef.current = client;
+        connectWebSocket(crdt);
       })
       .catch(err => {
         console.error('Failed to load document:', err);
-        const client = new Client({
-          webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
-          onConnect: () => {
-            setStatus('Connected');
-            client.subscribe('/topic/document/' + documentId, (message) => {
-              const data = JSON.parse(message.body);
-              const applied = crdt.applyRemoteOperation(data.operation);
-              if (applied) {
-                setRemoteOps(prev => [...prev, data.operation]);
-              }
-            });
-            client.subscribe('/topic/presence/' + documentId, (message) => {
-              setUsers(JSON.parse(message.body));
-            });
-            client.publish({
-              destination: '/app/document.join',
-              body: JSON.stringify({ documentId, siteId, userName }),
-            });
-            setReady(true);
-          },
-          onWebSocketClose: () => setStatus('Disconnected'),
-        });
-        client.activate();
-        clientRef.current = client;
+        connectWebSocket(crdt);
       });
+
+    function connectWebSocket(crdt: CrdtEngine) {
+      const client = new Client({
+        webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+        onConnect: () => {
+          setStatus('connected');
+
+          client.subscribe('/topic/document/' + documentId, (message) => {
+            const data = JSON.parse(message.body);
+            const applied = crdt.applyRemoteOperation(data.operation);
+            if (applied) {
+              setRemoteOps(prev => [...prev, data.operation]);
+            }
+          });
+
+          client.subscribe('/topic/presence/' + documentId, (message) => {
+            const userList: User[] = JSON.parse(message.body);
+            setUsers(userList);
+            const me = userList.find(u => u.siteId === siteId);
+            if (me) setMyColor(me.color);
+          });
+
+          client.subscribe('/topic/cursor/' + documentId, (message) => {
+            const cursor: CursorInfo = JSON.parse(message.body);
+            if (cursor.siteId !== siteId) {
+              setCursors(prev => {
+                const next = new Map(prev);
+                next.set(cursor.siteId, cursor);
+                return next;
+              });
+            }
+          });
+
+          client.publish({
+            destination: '/app/document.join',
+            body: JSON.stringify({ documentId, siteId, userName }),
+          });
+
+          setReady(true);
+        },
+        onWebSocketClose: () => setStatus('disconnected'),
+      });
+
+      client.activate();
+      clientRef.current = client;
+    }
 
     return () => {
       if (clientRef.current?.active) {
@@ -119,19 +136,34 @@ export function DocumentPage() {
   }, [documentId, siteId, userName]);
 
   return (
-    <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
-      <h1>Document: {documentId}</h1>
-      <p style={{ fontSize: 12, color: '#888' }}>
-        Share this URL to collaborate: {window.location.href}
-      </p>
-      <PresenceBar users={users} currentSiteId={siteId} />
-      {ready && crdtRef.current && (
-        <Editor
-          crdt={crdtRef.current}
-          onOperation={sendOperation}
-          remoteOps={remoteOps}
-        />
-      )}
+    <div className="doc-container">
+      <div className="doc-header">
+        <div className="doc-header-left">
+          <button className="doc-back-btn" onClick={() => navigate('/')}>←</button>
+          <span className="doc-title">{documentId}</span>
+          <div className={`doc-status ${status === 'disconnected' ? 'disconnected' : ''}`}>
+            <div className="doc-status-dot" />
+            {status === 'connected' ? 'Connected' : status === 'connecting' ? 'Connecting...' : 'Disconnected'}
+          </div>
+        </div>
+        <div className="doc-header-right">
+          <PresenceBar users={users} currentSiteId={siteId} />
+          <button className={`doc-share-btn ${copied ? 'copied' : ''}`} onClick={copyLink}>
+            {copied ? '✓ Copied' : 'Share Link'}
+          </button>
+        </div>
+      </div>
+      <div className="doc-editor-area">
+        {ready && crdtRef.current && (
+          <Editor
+            crdt={crdtRef.current}
+            onOperation={sendOperation}
+            onCursorChange={sendCursor}
+            remoteCursors={cursors}
+            remoteOps={remoteOps}
+          />
+        )}
+      </div>
     </div>
   );
 }

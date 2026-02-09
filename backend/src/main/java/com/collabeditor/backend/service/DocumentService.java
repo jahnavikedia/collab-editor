@@ -91,4 +91,12 @@ public class DocumentService {
             throw new RuntimeException("Failed to load CRDT state", e);
         }
     }
+
+    public void clearDocument(String documentId) {
+        // Remove from active documents
+        activeDocuments.remove(documentId);
+        dirtyDocuments.remove(documentId);
+        // Delete from database
+        repository.deleteById(documentId);
+    }
 }

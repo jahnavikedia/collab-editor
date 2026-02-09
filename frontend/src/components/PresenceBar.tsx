@@ -11,38 +11,23 @@ interface PresenceBarProps {
   currentSiteId: string;
 }
 
+function getInitials(name: string): string {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
 export const PresenceBar: React.FC<PresenceBarProps> = ({ users, currentSiteId }) => {
   return (
-    <div style={{
-      display: 'flex',
-      gap: 8,
-      padding: '8px 0',
-      flexWrap: 'wrap',
-      alignItems: 'center',
-    }}>
-      <span style={{ fontSize: 13, color: '#888', marginRight: 4 }}>Online:</span>
+    <div className="presence-bar">
       {users.map(user => (
         <div
           key={user.siteId}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '4px 10px',
-            borderRadius: 16,
-            backgroundColor: user.color + '22',
-            border: `1px solid ${user.color}`,
-            fontSize: 13,
-          }}
+          className="presence-avatar"
+          style={{ backgroundColor: user.color }}
         >
-          <div style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            backgroundColor: user.color,
-          }} />
-          {user.userName}
-          {user.siteId === currentSiteId && <span style={{ fontSize: 11, color: '#888' }}>(you)</span>}
+          {getInitials(user.userName)}
+          <span className="tooltip">
+            {user.userName}{user.siteId === currentSiteId ? ' (you)' : ''}
+          </span>
         </div>
       ))}
     </div>

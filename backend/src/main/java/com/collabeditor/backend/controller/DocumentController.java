@@ -86,4 +86,30 @@ public class DocumentController {
         public String getSiteId() { return siteId; }
         public void setSiteId(String siteId) { this.siteId = siteId; }
     }
+
+    @MessageMapping("/document.cursor")
+    public void handleCursor(@Payload CursorMessage message) {
+        messagingTemplate.convertAndSend(
+            "/topic/cursor/" + message.getDocumentId(), message
+        );
+    }
+
+    public static class CursorMessage {
+        private String documentId;
+        private String siteId;
+        private String userName;
+        private String color;
+        private int position;
+        public CursorMessage() {}
+        public String getDocumentId() { return documentId; }
+        public void setDocumentId(String documentId) { this.documentId = documentId; }
+        public String getSiteId() { return siteId; }
+        public void setSiteId(String siteId) { this.siteId = siteId; }
+        public String getUserName() { return userName; }
+        public void setUserName(String userName) { this.userName = userName; }
+        public String getColor() { return color; }
+        public void setColor(String color) { this.color = color; }
+        public int getPosition() { return position; }
+        public void setPosition(int position) { this.position = position; }
+    }
 }

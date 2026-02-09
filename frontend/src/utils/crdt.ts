@@ -73,7 +73,7 @@ export class CrdtEngine {
       type: 'DELETE',
       character: { ...charToDelete, tombstone: true },
       documentId: this.documentId,
-      siteId: charToDelete.siteId,
+      siteId: this.siteId, // Use deleter's siteId, not character's original siteId
       clock: charToDelete.clock,
     };
   }
@@ -83,6 +83,9 @@ export class CrdtEngine {
    */
   applyRemoteOperation(op: CrdtOperation): boolean {
     if (op.siteId === this.siteId) return false; // skip our own
+
+    // Lamport timestamp: update our clock to maintain causal ordering
+    this.counter = Math.max(this.counter, op.clock);
 
     switch (op.type) {
       case 'INSERT': return this.applyInsert(op.character);
@@ -128,7 +131,9 @@ export class CrdtEngine {
       }
     } else {
       const parentIdx = this.idIndex.get(newChar.parentId);
-      if (parentIdx === undefined) return false;
+      if (parentIdx === undefined) {
+        return false;
+      }
 
       insertIdx = parentIdx + 1;
       while (insertIdx < this.sequence.length) {
