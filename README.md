@@ -13,6 +13,7 @@ A real-time collaborative text editor built from scratch, featuring a custom CRD
 - **Shareable URLs** — Each document gets a unique URL for easy sharing
 - **Persistent storage** — Documents survive server restarts with periodic database snapshots
 - **Dark theme UI** — Clean, modern interface inspired by GitHub's design
+- **Document export** — Download documents as .txt or .docx files
 
 ## Architecture
 
