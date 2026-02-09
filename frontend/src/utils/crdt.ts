@@ -90,6 +90,19 @@ export class CrdtEngine {
     }
   }
 
+  /**
+   * Load CRDT state directly from server's ordered sequence.
+   * Use this when fetching initial document state - do NOT replay through insert algorithm.
+   */
+  loadFromState(chars: CrdtChar[]): void {
+    this.sequence = [...chars];
+    this.rebuildIndex();
+
+    // Update counter to max clock value to avoid ID conflicts
+    const maxClock = chars.reduce((max, c) => Math.max(max, c.clock), 0);
+    this.counter = Math.max(this.counter, maxClock);
+  }
+
   getText(): string {
     return this.sequence.filter(c => !c.tombstone).map(c => c.value).join('');
   }
