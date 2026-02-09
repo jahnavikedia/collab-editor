@@ -2,6 +2,8 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { saveAs } from 'file-saver';
 import { Editor } from '../components/Editor';
 import { PresenceBar } from '../components/PresenceBar';
 import { CrdtEngine, CrdtOperation } from '../utils/crdt';
@@ -27,8 +29,10 @@ export function DocumentPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [cursors, setCursors] = useState<Map<string, CursorInfo>>(new Map());
   const [copied, setCopied] = useState(false);
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const clientRef = useRef<Client | null>(null);
   const crdtRef = useRef<CrdtEngine | null>(null);
+  const downloadDropdownRef = useRef<HTMLDivElement | null>(null);
   const [siteId] = useState(() => 'user-' + Math.random().toString(36).substr(2, 6));
   const [userName] = useState(() => 'User ' + Math.random().toString(36).substr(2, 4).toUpperCase());
   const [myColor, setMyColor] = useState('#58a6ff');
@@ -56,6 +60,38 @@ export function DocumentPage() {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadTxt = () => {
+    const text = crdtRef.current?.getText() || '';
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${documentId}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setShowDownloadDropdown(false);
+  };
+
+  const handleDownloadDocx = async () => {
+    const text = crdtRef.current?.getText() || '';
+    const lines = text.split('\n');
+
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: lines.map(line =>
+          new Paragraph({
+            children: [new TextRun(line || ' ')],
+          })
+        ),
+      }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `${documentId}.docx`);
+    setShowDownloadDropdown(false);
   };
 
   useEffect(() => {
@@ -135,6 +171,23 @@ export function DocumentPage() {
     };
   }, [documentId, siteId, userName]);
 
+  // Close download dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (downloadDropdownRef.current && !downloadDropdownRef.current.contains(event.target as Node)) {
+        setShowDownloadDropdown(false);
+      }
+    };
+
+    if (showDownloadDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showDownloadDropdown]);
+
   return (
     <div className="doc-container">
       <div className="doc-header">
@@ -148,6 +201,24 @@ export function DocumentPage() {
         </div>
         <div className="doc-header-right">
           <PresenceBar users={users} currentSiteId={siteId} />
+          <div style={{ position: 'relative' }} ref={downloadDropdownRef}>
+            <button
+              className="doc-share-btn"
+              onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+            >
+              ⬇ Download
+            </button>
+            {showDownloadDropdown && (
+              <div className="doc-download-dropdown">
+                <div className="doc-download-option" onClick={handleDownloadTxt}>
+                  Save as .txt
+                </div>
+                <div className="doc-download-option" onClick={handleDownloadDocx}>
+                  Save as .docx
+                </div>
+              </div>
+            )}
+          </div>
           <button className={`doc-share-btn ${copied ? 'copied' : ''}`} onClick={copyLink}>
             {copied ? '✓ Copied' : 'Share Link'}
           </button>
