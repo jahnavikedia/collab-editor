@@ -2,6 +2,8 @@
 
 A real-time collaborative text editor built from scratch, featuring a custom CRDT (Conflict-free Replicated Data Type) engine for conflict resolution, WebSocket-based synchronization, and live cursor tracking.
 
+Live Demo: https://collab-editor-mns4.onrender.com/
+
 ![CollabEdit Screenshot](docs/screenshot.png)
 
 ## Features
