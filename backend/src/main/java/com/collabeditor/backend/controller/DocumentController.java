@@ -1,37 +1,30 @@
 package com.collabeditor.backend.controller;
 
 import com.collabeditor.backend.model.CrdtOperation;
-import com.collabeditor.backend.service.CrdtDocument;
+import com.collabeditor.backend.service.DocumentService;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 @Controller
 public class DocumentController {
 
     private final SimpMessagingTemplate messagingTemplate;
-    private final Map<String, CrdtDocument> documents = new ConcurrentHashMap<>();
+    private final DocumentService documentService;
 
-    public DocumentController(SimpMessagingTemplate messagingTemplate) {
+    public DocumentController(SimpMessagingTemplate messagingTemplate, DocumentService documentService) {
         this.messagingTemplate = messagingTemplate;
+        this.documentService = documentService;
     }
 
     @MessageMapping("/document.edit")
     public void handleEdit(@Payload EditMessage message) {
         String docId = message.getDocumentId();
 
-        // Get or create the document
-        CrdtDocument doc = documents.computeIfAbsent(docId, CrdtDocument::new);
-
-        // Apply operation to server-side CRDT
-        boolean applied = doc.applyOperation(message.getOperation());
+        boolean applied = documentService.applyOperation(docId, message.getOperation());
 
         if (applied) {
-            // Broadcast to all subscribers of this document
             messagingTemplate.convertAndSend(
                 "/topic/document/" + docId,
                 message
@@ -39,7 +32,6 @@ public class DocumentController {
         }
     }
 
-    // Inner class for the incoming message format
     public static class EditMessage {
         private String documentId;
         private CrdtOperation operation;

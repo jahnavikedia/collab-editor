@@ -20,7 +20,7 @@ export const Editor: React.FC<EditorProps> = ({ crdt, onOperation, remoteOps }) 
     if (!editorRef.current) return;
 
     const state = EditorState.create({
-      doc: '',
+      doc: crdt.getText(),
       extensions: [
         basicSetup,
         oneDark,

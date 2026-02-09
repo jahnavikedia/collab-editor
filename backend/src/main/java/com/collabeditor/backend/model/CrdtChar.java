@@ -1,5 +1,8 @@
 package com.collabeditor.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CrdtChar {
 
     private String id;        // "siteId-counter" — globally unique

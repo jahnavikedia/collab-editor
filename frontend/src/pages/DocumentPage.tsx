@@ -29,29 +29,71 @@ export function DocumentPage() {
     const crdt = new CrdtEngine(siteId, documentId);
     crdtRef.current = crdt;
 
-    const client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
-      onConnect: () => {
-        setStatus('Connected as ' + siteId);
-
-        client.subscribe('/topic/document/' + documentId, (message) => {
-          const data = JSON.parse(message.body);
-          const applied = crdt.applyRemoteOperation(data.operation);
-          if (applied) {
-            setRemoteOps(prev => [...prev, data.operation]);
+    fetch(`http://localhost:8080/api/documents/${documentId}/state`)
+      .then(res => res.json())
+      .then(chars => {
+        chars.forEach((c: any) => {
+          if (!c.tombstone) {
+            crdt.applyRemoteOperation({
+              type: 'INSERT',
+              character: c,
+              documentId: documentId,
+              siteId: c.siteId,
+              clock: c.clock,
+            });
           }
         });
 
-        setReady(true);
-      },
-      onWebSocketClose: () => setStatus('Disconnected'),
-    });
+        // Trigger editor to show loaded text
+        if (chars.length > 0) {
+          setRemoteOps([{ type: 'INSERT', character: chars[0], documentId: documentId!, siteId: chars[0].siteId, clock: chars[0].clock }]);
+        }
 
-    client.activate();
-    clientRef.current = client;
+        // Now connect WebSocket
+        const client = new Client({
+          webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+          onConnect: () => {
+            setStatus('Connected as ' + siteId);
+
+            client.subscribe('/topic/document/' + documentId, (message) => {
+              const data = JSON.parse(message.body);
+              const applied = crdt.applyRemoteOperation(data.operation);
+              if (applied) {
+                setRemoteOps(prev => [...prev, data.operation]);
+              }
+            });
+
+            setReady(true);
+          },
+          onWebSocketClose: () => setStatus('Disconnected'),
+        });
+
+        client.activate();
+        clientRef.current = client;
+      })
+      .catch(err => {
+        console.error('Failed to load document:', err);
+        const client = new Client({
+          webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+          onConnect: () => {
+            setStatus('Connected as ' + siteId);
+            client.subscribe('/topic/document/' + documentId, (message) => {
+              const data = JSON.parse(message.body);
+              const applied = crdt.applyRemoteOperation(data.operation);
+              if (applied) {
+                setRemoteOps(prev => [...prev, data.operation]);
+              }
+            });
+            setReady(true);
+          },
+          onWebSocketClose: () => setStatus('Disconnected'),
+        });
+        client.activate();
+        clientRef.current = client;
+      });
 
     return () => {
-      client.deactivate();
+      clientRef.current?.deactivate();
     };
   }, [documentId, siteId]);
 

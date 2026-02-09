@@ -145,4 +145,15 @@ public class CrdtDocument {
             idIndex.put(sequence.get(i).getId(), i);
         }
     }
+
+    /**
+     * Load state directly from a saved sequence.
+     * No need to replay the insert algorithm — the order is already correct.
+     */
+    public void loadFromState(List<CrdtChar> chars) {
+        sequence.clear();
+        sequence.addAll(chars);
+        rebuildIndex();
+    }
+
 }
